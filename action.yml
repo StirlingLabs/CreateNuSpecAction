@@ -1,0 +1,294 @@
+inputs:
+  id:
+    description: The NuPkg ID (e.g. StirlingLabs.Utilities.Magic)
+    type: string
+    required: true
+  version:
+    description: Package version number
+    type: string
+    required: true
+  title:
+    description: Display title of the NuPkg, visible on nuget.org
+    type: string
+  description:
+    description: Description of the NuPkg, indexed and visible on nuget.org
+    type: string
+  authors:
+    description: Metadata authors of the NuPkg
+    type: string
+    default: Stirling Labs Team
+  homepage:
+    description: Link to information about the project
+    type: string
+  readme:
+    description: Readme file location
+    type: string
+    default: README.md
+  icon:
+    description: Icon file location (64x64 PNG)
+    type: string
+    default: docs/SL.png
+  tags:
+    description: Tags that help describe the project or make it more findable
+    type: string
+  license:
+    description: SPDX License code (see https://spdx.org/licenses/)
+    type: string
+  files:
+    description: Path of files that should be included in the NuPkg including filename, in space-separated format (wildcards ok) e.g. 'file1 "file 2"'.
+    type: string
+    required: true
+  fileLocations: 
+    description: If the path of the above files is not as it should be placed in the NuPkg, provide them here, in space-separated format.
+    type: string
+outputs:
+  continue:
+    description: "Processing on this repo should continue"
+    value: ${{ jobs.check.outputs.continue }}
+
+runs:
+  using: 'composite'
+    steps:
+      - name: Debugging
+        if: true
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+        run: echo "$GITHUB_CONTEXT"
+
+    - name: Title
+      id: title
+      env:
+        title: ${{ inputs.title }}
+        githubRepository: ${{ github.repository }}
+        version: ${{ inputs.version }}
+      run: |
+        if [ "$title" == "" ] ; then
+          title="${githubRepository#*/} $version"
+          echo "::set-output name=title::$title"
+        fi
+
+    - name: Description
+      id: description
+      env:
+        description: ${{ inputs.description }}
+        githubRepositoryDescription: ${{ github.event.repository.description }}
+      run: |
+        if [ "$description" != "" ] ; then
+          echo "Description is... $description"
+        elif [ "$githubRepositoryDescription" != "" ]
+          description="$githubRepositoryDescription"
+          echo "Description is... $description"
+        else
+          echo "Must have a description!"
+          exit 1
+        fi
+        echo "::set-output name=description::$description"
+
+    - name: Homepage
+      id: url
+      env:
+        homepage: ${{ inputs.homepage }}
+        repoHomepage: ${{ github.event.repository.homepage }}
+        repoHtmlUrl: ${{ github.event.repository.html_url }}
+      run: |
+        if [ "$homepage" == "" ] ; then
+          homepage="$repoHomepage"
+        fi
+        if [ "$homepage" == "" ] ; then
+          homepage="$htmlUrl"
+        fi
+        if [ "$homepage" == "" ] ; then
+          homepage="https://stirlinglabs.com"
+        fi
+        echo "::set-output name=homepage::$homepage"
+
+    - name: ReadMe file
+      env:
+        readme: ${{ inputs.readme }}
+      run: |
+        if [[ -s "$readme" ]] ; then
+          echo "README exists at $readme"
+        else
+          echo "README does not exist at $readme"
+          exit 1
+        fi
+
+    - name: Icon file
+      id: readme
+      env:
+        readme: ${{ inputs.icon }}
+      run: |
+        if [[ -s "$icon" ]] ; then
+          echo "Icon exists at $icon"
+        else
+          echo "Icon does not exist at $icon, getting one"
+          wget --output-document "$icon" "https://raw.githubusercontent.com/StirlingLabs/CreateNuSpecAction/main/SL.png"
+          if [[ -s "$icon" ]] ; then
+            echo "Icon now exists at $icon"
+          else
+            echo "Icon still doesn't exist at $icon"
+            exit 1
+          fi
+        fi
+
+    - name: Tags
+      id: tags
+      env:
+        tags: ${{ input.tags }}
+        topics: ${{ toJSON(github.event.repository.topics) }}
+      run: |
+        topicsArray=$(echo $topics | jq -r '.[]')
+        if [ "$tags" == "" ] ; then
+          space=""
+        else
+          topics="$tags"
+          space=" "
+        fi
+        for topic in "${topicsArray[@]}" ; do
+          topics="$topics$space$topic"
+          space=" "
+        done
+        echo "::set-output name=tags::$topics"
+
+    - name: License
+      id: license
+      env:
+        license: ${{ inputs.license }}
+        repoLicense: ${{ github.event.repository.license.spdx_id }}
+      run: |
+        if [ "$license" == "" ] ; then
+          if [ "$repoLicense" != "" ] ; then
+            echo "Default is no published license (i.e. proprietary). This will probably fail."
+          else
+            license="$repoLicense"
+          fi
+        fi
+        echo "::set-output name=license::$license"
+
+    - name: Repo
+      id: git
+      env:
+        gitUrl: ${{ github.event.repository.git_url }}
+        defaultBranch: ${{ github.event.repository.default_branch }}
+        commit: ${{ github.sha }}
+      run: |
+        branch="${GITHUB_REF#refs/heads/}"
+        echo Branches current $branch default $defaultBranch
+        if [[ $branch == refs/tags/* ]] ; then
+          branch=$defaultBranch
+        fi
+        echo "::set-output name=url::$gitUrl"
+        echo "::set-output name=branch::$branch"
+        echo "::set-output name=commit::$commit"
+
+    - name: Files
+      id: files
+      env:
+        sources: ${{ inputs.sources }}
+        targets: ${{ inputs.targets }}
+      run: |
+        echo "Sources... ${sources}"
+        echo "Targets... ${targets)"
+        files=$(ls -1p ${sources})
+        echo "Files... ${files)"
+        f=0;i=0
+        fileSources=""
+        fileSourceSpace=""
+        for file in "${files[@]}" ; do
+          if [[ -f "$file" ]] ; then
+            source[i]="$file"
+            echo "${f}(${i}) ${file}"
+            fileSources="${fileSources}${fileSourceSpace}'${file}'"
+            fileSourceSpace=" "
+            f=$((f+1))
+          else
+            echo "File not found at $file"
+          fi
+          i=$((i+1))
+        done
+        if [[ $f -ne $i ]] ; then
+          echo "Only ${f}/${i} files found."
+        fi
+        t=0
+        for target in "${targets[@]}" ; do
+          fileTarget[$t]="${target}"
+          t=$((t+1))
+        done
+        ft=0
+        fileTargets=""
+        fileTargetSpace=""
+        for file in "${files[@]}" ; do
+          echo "$ft. file:$file target:$fileTarget[$ft]"
+          if [[ ($f -gt 1) && ($t -eq 1) ]] ; then
+            echo "f:$f > 1 && t:$t == 1"
+            if [[ $file == */* ]] ; then
+              echo "$file is not allowed to contain a / when multiple sources and a single target."
+              exit 1
+            else
+              fileTarget[$ft]="${target}/${file}"
+              fileTargets="${fileTargets}${fileTargetSpace}'${target}/${file}'"
+              fileTargetSpace=" "
+            fi
+          else
+            echo "f:$f !> 1 && t:$t != 1"
+            fileTargets="${fileTargets}${fileTargetSpace}'$fileTarget[$ft]'"
+            fileTargetSpace=" "
+          fi
+          ft=$((ft+1))
+        done
+        echo "sources:$fileSources"
+        echo "targets:$fileTargets"
+        echo "::set-output name=sources::$fileSources"
+        echo "::set-output name=targets::$fileTargets"
+
+    - name: Create NuSpec
+      env:
+        id: ${{ inputs.id }}
+        version: ${{ steps.version.outputs.version }}
+        title: ${{ steps.title.outputs.title }}
+        description: ${{ steps.description.outputs.description }}
+        authors: ${{ inputs.authors }}
+        homepage: ${{ steps.url.outputs.homepage }}
+        readme: ${{ inputs.readme }}
+        icon: ${{ inputs.icon }}
+        tags: ${{ steps.tags.outputs.tags }}
+        license: ${{ steps.license.outputs.license }}
+        gitUrl: ${{ steps.git.outputs.url }}
+        branch: ${{ steps.git.outputs.branch }}
+        commit: ${{ steps.git.outputs.commit }}
+        fileSources: ${{ steps.files.outputs.sources }}
+        fileTargets: ${{ steps.files.outputs.targets }}
+      run: |
+        t=0
+        for target in "${targets[@]}" ; do
+          fileTarget[$t]="${target}"
+          t=$((t+1))
+        done
+        text="<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+        text="$text\n<package xmlns=\"http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd\">"
+        text="$text\n <metadata>"
+        text="$text\n  <id>$id</id>"
+        text="$text\n  <version>$version</version>"
+        text="$text\n  <title>$title</title>"
+        text="$text\n  <description>$description</description>"
+        text="$text\n  <authors>$authors</authors>"
+        text="$text\n  <projectUrl>$homepage</projectUrl>"
+        text="$text\n  <readme>docs/README.md</readme>"
+        text="$text\n  <icon>images/icon.png</icon>"
+        text="$text\n  <tags>$tags</tags>"
+        text="$text\n  <license type=\"expression\">$license</license>"
+        text="$text\n  <requireLicenseAcceptance>true</requireLicenseAcceptance>"
+        text="$text\n  <repository type=\"git\" url=\"$gitUrl\" branch=\"$branch\" commit=\"$commit\" />"
+        text="$text\n </metadata>"
+        text="$text\n <files>"
+        text="$text\n  <file src=\"$readme\" target=\"docs/README.md\" />"
+        text="$text\n  <file src=\"$icon\" target=\"images/\" />"
+        s=0
+        for source in "${sources[@]}" ; do
+          text="$text\n  <file src=\"$source\" target=\"$fileTarget[$s]\" />"
+          s=$((s+1))
+        done
+        text="$text\n </files>"
+        text="$text\n</package>"
+        echo -e $text > $project.nuspec
+        cat $project.nuspec
