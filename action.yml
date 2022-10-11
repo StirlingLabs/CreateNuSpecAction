@@ -34,11 +34,11 @@ inputs:
   license:
     description: SPDX License code (see https://spdx.org/licenses/)
     type: string
-  files:
+  fileSources:
     description: Path of files that should be included in the NuPkg including filename, in space-separated format (wildcards ok) e.g. 'file1 "file 2"'.
     type: string
     required: true
-  fileLocations: 
+  fileTargets: 
     description: If the path of the above files is not as it should be placed in the NuPkg, provide them here, in space-separated format.
     type: string
 outputs:
@@ -144,7 +144,7 @@ runs:
           topics="$tags"
           space=" "
         fi
-        for topic in "${topicsArray[@]}" ; do
+        for topic in ${topicsArray[@]} ; do
           topics="$topics$space$topic"
           space=" "
         done
@@ -184,8 +184,8 @@ runs:
     - name: Files
       id: files
       env:
-        sources: ${{ inputs.sources }}
-        targets: ${{ inputs.targets }}
+        sources: ${{ inputs.fileSources }}
+        targets: ${{ inputs.fileTargets }}
       run: |
         echo "Sources... ${sources}"
         echo "Targets... ${targets)"
@@ -194,7 +194,7 @@ runs:
         f=0;i=0
         fileSources=""
         fileSourceSpace=""
-        for file in "${files[@]}" ; do
+        for file in ${files[@]} ; do
           if [[ -f "$file" ]] ; then
             source[i]="$file"
             echo "${f}(${i}) ${file}"
@@ -210,14 +210,14 @@ runs:
           echo "Only ${f}/${i} files found."
         fi
         t=0
-        for target in "${targets[@]}" ; do
+        for target in ${targets[@]} ; do
           fileTarget[$t]="${target}"
           t=$((t+1))
         done
         ft=0
         fileTargets=""
         fileTargetSpace=""
-        for file in "${files[@]}" ; do
+        for file in ${files[@]} ; do
           echo "$ft. file:$file target:$fileTarget[$ft]"
           if [[ ($f -gt 1) && ($t -eq 1) ]] ; then
             echo "f:$f > 1 && t:$t == 1"
@@ -230,7 +230,7 @@ runs:
               fileTargetSpace=" "
             fi
           else
-            echo "f:$f !> 1 && t:$t != 1"
+            echo "f:$f t:$t"
             fileTargets="${fileTargets}${fileTargetSpace}'$fileTarget[$ft]'"
             fileTargetSpace=" "
           fi
@@ -260,7 +260,7 @@ runs:
         fileTargets: ${{ steps.files.outputs.targets }}
       run: |
         t=0
-        for target in "${targets[@]}" ; do
+        for target in ${targets[@]} ; do
           fileTarget[$t]="${target}"
           t=$((t+1))
         done
@@ -284,11 +284,13 @@ runs:
         text="$text\n  <file src=\"$readme\" target=\"docs/README.md\" />"
         text="$text\n  <file src=\"$icon\" target=\"images/\" />"
         s=0
-        for source in "${sources[@]}" ; do
+        for source in ${sources[@]} ; do
           text="$text\n  <file src=\"$source\" target=\"$fileTarget[$s]\" />"
           s=$((s+1))
         done
         text="$text\n </files>"
         text="$text\n</package>"
-        echo -e $text > $project.nuspec
-        cat $project.nuspec
+        filename=$project.nuspec
+        echo -e $text > $filename
+        cat $filename
+        echo "::set-output name=filename::${filename}"
