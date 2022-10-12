@@ -51,12 +51,14 @@ runs:
   steps:
     - name: Debugging
       if: false
+      shell: bash
       env:
         GITHUB_CONTEXT: ${{ toJSON(github) }}
       run: echo "$GITHUB_CONTEXT"
 
     - name: Title
       id: title
+      shell: bash
       env:
         title: ${{ inputs.title }}
         githubRepository: ${{ github.repository }}
@@ -69,13 +71,14 @@ runs:
 
     - name: Description
       id: description
+      shell: bash
       env:
         description: ${{ inputs.description }}
         githubRepositoryDescription: ${{ github.event.repository.description }}
       run: |
         if [ "$description" != "" ] ; then
           echo "Description is... $description"
-        elif [ "$githubRepositoryDescription" != "" ]
+        elif [ "$githubRepositoryDescription" != "" ] ; then
           description="$githubRepositoryDescription"
           echo "Description is... $description"
         else
@@ -86,6 +89,7 @@ runs:
 
     - name: Homepage
       id: url
+      shell: bash
       env:
         homepage: ${{ inputs.homepage }}
         repoHomepage: ${{ github.event.repository.homepage }}
@@ -103,6 +107,8 @@ runs:
         echo "::set-output name=homepage::$homepage"
 
     - name: ReadMe file
+      id: readme
+      shell: bash
       env:
         readme: ${{ inputs.readme }}
       run: |
@@ -114,9 +120,10 @@ runs:
         fi
 
     - name: Icon file
-      id: readme
+      id: icon
+      shell: bash
       env:
-        readme: ${{ inputs.icon }}
+        icon: ${{ inputs.icon }}
       run: |
         if [[ -s "$icon" ]] ; then
           echo "Icon exists at $icon"
@@ -133,8 +140,9 @@ runs:
 
     - name: Tags
       id: tags
+      shell: bash
       env:
-        tags: ${{ input.tags }}
+        tags: ${{ inputs.tags }}
         topics: ${{ toJSON(github.event.repository.topics) }}
       run: |
         topicsArray=$(echo $topics | jq -r '.[]')
@@ -152,6 +160,7 @@ runs:
 
     - name: License
       id: license
+      shell: bash
       env:
         license: ${{ inputs.license }}
         repoLicense: ${{ github.event.repository.license.spdx_id }}
@@ -167,6 +176,7 @@ runs:
 
     - name: Repo
       id: git
+      shell: bash
       env:
         gitUrl: ${{ github.event.repository.git_url }}
         defaultBranch: ${{ github.event.repository.default_branch }}
@@ -183,6 +193,7 @@ runs:
 
     - name: Files
       id: files
+      shell: bash
       env:
         sources: ${{ inputs.fileSources }}
         targets: ${{ inputs.fileTargets }}
@@ -243,6 +254,7 @@ runs:
 
     - name: Create NuSpec
       id: create
+      shell: bash
       env:
         id: ${{ inputs.id }}
         version: ${{ steps.version.outputs.version }}
