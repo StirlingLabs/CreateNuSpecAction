@@ -42,18 +42,18 @@ inputs:
     description: If the path of the above files is not as it should be placed in the NuPkg, provide them here, in space-separated format.
     type: string
 outputs:
-  continue:
-    description: "Processing on this repo should continue"
-    value: ${{ jobs.check.outputs.continue }}
+  filename:
+    description: "Filename of the created NuSpec"
+    value: ${{ steps.create.outputs.filename }}
 
 runs:
   using: 'composite'
-    steps:
-      - name: Debugging
-        if: true
-        env:
-          GITHUB_CONTEXT: ${{ toJSON(github) }}
-        run: echo "$GITHUB_CONTEXT"
+  steps:
+    - name: Debugging
+      if: false
+      env:
+        GITHUB_CONTEXT: ${{ toJSON(github) }}
+      run: echo "$GITHUB_CONTEXT"
 
     - name: Title
       id: title
@@ -242,6 +242,7 @@ runs:
         echo "::set-output name=targets::$fileTargets"
 
     - name: Create NuSpec
+      id: create
       env:
         id: ${{ inputs.id }}
         version: ${{ steps.version.outputs.version }}
