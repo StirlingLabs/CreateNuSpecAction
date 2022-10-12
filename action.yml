@@ -149,14 +149,14 @@ runs:
         if [ "$tags" == "" ] ; then
           space=""
         else
-          topics="$tags"
+          t="$tags"
           space=" "
         fi
         for topic in ${topicsArray[@]} ; do
-          topics="$topics$space$topic"
+          t="$t$space$topic"
           space=" "
         done
-        echo "::set-output name=tags::$topics"
+        echo "::set-output name=tags::$t"
 
     - name: License
       id: license
@@ -273,37 +273,39 @@ runs:
         fileTargets: ${{ steps.files.outputs.targets }}
       run: |
         t=0
-        for target in ${targets[@]} ; do
+        for target in ${fileTargets[@]} ; do
           fileTarget[$t]="${target}"
           t=$((t+1))
         done
         text="<?xml version=\"1.0\" encoding=\"utf-8\"?>"
-        text="$text\n<package xmlns=\"http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd\">"
-        text="$text\n <metadata>"
-        text="$text\n  <id>$id</id>"
-        text="$text\n  <version>$version</version>"
-        text="$text\n  <title>$title</title>"
-        text="$text\n  <description>$description</description>"
-        text="$text\n  <authors>$authors</authors>"
-        text="$text\n  <projectUrl>$homepage</projectUrl>"
-        text="$text\n  <readme>docs/README.md</readme>"
-        text="$text\n  <icon>images/icon.png</icon>"
-        text="$text\n  <tags>$tags</tags>"
-        text="$text\n  <license type=\"expression\">$license</license>"
-        text="$text\n  <requireLicenseAcceptance>true</requireLicenseAcceptance>"
-        text="$text\n  <repository type=\"git\" url=\"$gitUrl\" branch=\"$branch\" commit=\"$commit\" />"
-        text="$text\n </metadata>"
-        text="$text\n <files>"
-        text="$text\n  <file src=\"$readme\" target=\"docs/README.md\" />"
-        text="$text\n  <file src=\"$icon\" target=\"images/\" />"
+        text="${text}\n<package xmlns=\"http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd\">"
+        text="${text}\n <metadata>"
+        text="${text}\n  <id>${id}</id>"
+        text="${text}\n  <version>${version}</version>"
+        text="${text}\n  <title>${title}</title>"
+        text="${text}\n  <description>${description}</description>"
+        text="${text}\n  <authors>${authors}</authors>"
+        text="${text}\n  <projectUrl>${homepage}</projectUrl>"
+        text="${text}\n  <readme>docs/README.md</readme>"
+        text="${text}\n  <icon>images/icon.png</icon>"
+        text="${text}\n  <tags>$tags</tags>"
+        text="${text}\n  <license type=\"expression\">${license}</license>"
+        text="${text}\n  <requireLicenseAcceptance>true</requireLicenseAcceptance>"
+        text="${text}\n  <repository type=\"git\" url=\"${gitUrl}\" branch=\"${branch}\" commit=\"${commit}\" />"
+        text="${text}\n </metadata>"
+        text="${text}\n <files>"
+        text="${text}\n  <file src=\"${readme}\" target=\"docs/README.md\" />"
+        text="${text}\n  <file src=\"${icon}\" target=\"images/icon.png\" />"
         s=0
-        for source in ${sources[@]} ; do
-          text="$text\n  <file src=\"$source\" target=\"$fileTarget[$s]\" />"
+        for source in ${fileSources[@]} ; do
+          target="${fileTarget[$s]}"
+          echo "Adding ${source} -> ${target}"
+          text="${text}\n  <file src=\"${source}\" target=\"${target}\" />"
           s=$((s+1))
         done
-        text="$text\n </files>"
-        text="$text\n</package>"
-        filename=$project.nuspec
+        text="${text}\n </files>"
+        text="${text}\n</package>"
+        filename=${id}.nuspec
         echo -e $text > $filename
         cat $filename
         echo "::set-output name=filename::${filename}"
