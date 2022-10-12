@@ -145,7 +145,7 @@ runs:
         tags: ${{ inputs.tags }}
         topics: ${{ toJSON(github.event.repository.topics) }}
       run: |
-        topicsArray=$(echo $topics | jq -r '.[]')
+        topicsArray=$(jq -r '.[]' <<< $topics)
         if [ "$tags" == "" ] ; then
           space=""
         else
@@ -187,9 +187,9 @@ runs:
         if [[ $branch == refs/tags/* ]] ; then
           branch=$defaultBranch
         fi
-        echo "::set-output name=url::$gitUrl"
-        echo "::set-output name=branch::$branch"
-        echo "::set-output name=commit::$commit"
+        echo "::set-output name=url::${gitUrl}"
+        echo "::set-output name=branch::${branch}"
+        echo "::set-output name=commit::${commit}"
 
     - name: Files
       id: files
@@ -199,9 +199,9 @@ runs:
         targets: ${{ inputs.fileTargets }}
       run: |
         echo "Sources... ${sources}"
-        echo "Targets... ${targets)"
+        echo "Targets... ${targets}"
         files=$(ls -1p ${sources})
-        echo "Files... ${files)"
+        echo "Files... ${files}"
         f=0;i=0
         fileSources=""
         fileSourceSpace=""
