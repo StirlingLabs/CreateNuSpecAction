@@ -34,6 +34,15 @@ inputs:
   license:
     description: SPDX License code (see https://spdx.org/licenses/)
     type: string
+  gitUrl:
+    description: The URL of the git repo for the source used to build the binaries in this package
+    type: string
+  gitBranch:
+    description: The git branch of the source used to build the binaries in this package
+    type: string
+  gitCommit:
+    description: The git commit of the source used to build the binaries in this package
+    type: string
   fileSources:
     description: Path of files that should be included in the NuPkg including filename, in space-separated format (wildcards ok) e.g. 'file1 "file 2"'.
     type: string
@@ -66,8 +75,8 @@ runs:
       run: |
         if [ "$title" == "" ] ; then
           title="${githubRepository#*/} $version"
-          echo "::set-output name=title::$title"
         fi
+        echo "::set-output name=title::$title"
 
     - name: Description
       id: description
@@ -99,7 +108,7 @@ runs:
           homepage="$repoHomepage"
         fi
         if [ "$homepage" == "" ] ; then
-          homepage="$htmlUrl"
+          homepage="$repoHtmlUrl"
         fi
         if [ "$homepage" == "" ] ; then
           homepage="https://stirlinglabs.com"
@@ -167,9 +176,9 @@ runs:
       run: |
         if [ "$license" == "" ] ; then
           if [ "$repoLicense" != "" ] ; then
-            echo "Default is no published license (i.e. proprietary). This will probably fail."
-          else
             license="$repoLicense"
+          else
+            echo "Defaulting to no published license (i.e. proprietary). This will probably fail."
           fi
         fi
         echo "::set-output name=license::$license"
@@ -178,18 +187,29 @@ runs:
       id: git
       shell: bash
       env:
-        gitUrl: ${{ github.event.repository.git_url }}
-        defaultBranch: ${{ github.event.repository.default_branch }}
-        commit: ${{ github.sha }}
+        gitUrl: ${{ inputs.gitUrl }}
+        gitBranch: ${{ inputs.gitBranch }}
+        gitCommit: ${{ inputs.gitCommit }}
+        currentRepoUrl: ${{ github.event.repository.git_url }}
+        currentRepoDefaultBranch: ${{ github.event.repository.default_branch }}
+        currentRepoCommit: ${{ github.sha }}
       run: |
-        branch="${GITHUB_REF#refs/heads/}"
-        echo Branches current $branch default $defaultBranch
-        if [[ $branch == refs/tags/* ]] ; then
-          branch=$defaultBranch
+        if [[ "$gitUrl" == "" ]] ; then
+          gitUrl=$currentRepoUrl
+        fi
+        if [[ "$gitBranch" == "" ]] ; then
+          gitBranch="${GITHUB_REF#refs/heads/}"
+          echo Branches current $gitBranch default $defaultBranch
+          if [[ $gitBranch == refs/tags/* ]] ; then
+            gitBranch=$currentRepoDefaultBranch
+          fi
+        fi
+        if [[ "$gitCommit" == "" ]] ; then
+          gitCommit=$currentRepoCommit
         fi
         echo "::set-output name=url::${gitUrl}"
-        echo "::set-output name=branch::${branch}"
-        echo "::set-output name=commit::${commit}"
+        echo "::set-output name=branch::${gitBranch}"
+        echo "::set-output name=commit::${gitCommit}"
 
     - name: Files
       id: files
@@ -200,64 +220,47 @@ runs:
       run: |
         echo "Sources... ${sources}"
         echo "Targets... ${targets}"
-        files=$(ls -1p ${sources})
-        echo "Files... ${files}"
-        f=0;i=0
-        fileSources=""
-        fileSourceSpace=""
-        for file in ${files[@]} ; do
-          if [[ -f "$file" ]] ; then
-            source[i]="$file"
-            echo "${f}(${i}) ${file}"
-            fileSources="${fileSources}${fileSourceSpace}'${file}'"
-            fileSourceSpace=" "
-            f=$((f+1))
+        # Create an array of source files
+        sourceCount=0
+        for source in ${sources[@]} ; do
+          if [[ -d $source ]] ; then
+            # source is a directory, get the list of individual files from disk
+            sourceFiles[${sourceCount}]=$(ls -1p ${source})
+            echo "Adding files in $source... $sourceFiles{[${sourceCount}]}"
+          elif [[ -f $source ]] ; then
+            sourceFiles[${sourceCount}]=$source
+            echo "Adding $source"
           else
-            echo "File not found at $file"
+            echo "File in $source does not exist"
+            exit 1
           fi
-          i=$((i+1))
+          sourceCount=$((sourceCount+1))
         done
-        if [[ $f -ne $i ]] ; then
-          echo "Only ${f}/${i} files found."
-        fi
-        t=0
+        # Create a JSON document aligning sources with targets
+        json="[ "
+        targetCount=0
         for target in ${targets[@]} ; do
-          fileTarget[$t]="${target}"
-          t=$((t+1))
+          fileCount=0
+          for file in ${sourceFiles[${targetCount}]} ; do
+            json="${json}${jsonComma}{\"source\": \"${file}\", \"target\": \"${target}\"}"
+            jsonComma=", "
+            echo "${targetCount}:${fileCount} ${file} -> ${target}"
+            fileCount=$((fileCount+1))
+          done
+          targetCount=$((targetCount+1))
         done
-        ft=0
-        fileTargets=""
-        fileTargetSpace=""
-        for file in ${files[@]} ; do
-          echo "$ft. file:$file target:$fileTarget[$ft]"
-          if [[ ($f -gt 1) && ($t -eq 1) ]] ; then
-            echo "f:$f > 1 && t:$t == 1"
-            if [[ $file == */* ]] ; then
-              echo "$file is not allowed to contain a / when multiple sources and a single target."
-              exit 1
-            else
-              fileTarget[$ft]="${target}/${file}"
-              fileTargets="${fileTargets}${fileTargetSpace}'${target}/${file}'"
-              fileTargetSpace=" "
-            fi
-          else
-            echo "f:$f t:$t"
-            fileTargets="${fileTargets}${fileTargetSpace}'$fileTarget[$ft]'"
-            fileTargetSpace=" "
-          fi
-          ft=$((ft+1))
-        done
-        echo "sources:$fileSources"
-        echo "targets:$fileTargets"
-        echo "::set-output name=sources::$fileSources"
-        echo "::set-output name=targets::$fileTargets"
+        json="${json} ]"
+        echo "---"
+        echo $json
+        echo "---"
+        echo "::set-output name=json::$json"
 
     - name: Create NuSpec
       id: create
       shell: bash
       env:
         id: ${{ inputs.id }}
-        version: ${{ steps.version.outputs.version }}
+        version: ${{ inputs.version }}
         title: ${{ steps.title.outputs.title }}
         description: ${{ steps.description.outputs.description }}
         authors: ${{ inputs.authors }}
@@ -269,11 +272,15 @@ runs:
         gitUrl: ${{ steps.git.outputs.url }}
         branch: ${{ steps.git.outputs.branch }}
         commit: ${{ steps.git.outputs.commit }}
-        fileSources: ${{ steps.files.outputs.sources }}
-        fileTargets: ${{ steps.files.outputs.targets }}
+        files: ${{ steps.files.outputs.json }}
       run: |
+        echo "files... ${files}"
+        sources=$(jq -r ".[].source" <<< $files)
+        targets=$(jq -r ".[].target" <<< $files)
+        echo "Sources... ${sources}"
+        echo "Targets... ${targets}"
         t=0
-        for target in ${fileTargets[@]} ; do
+        for target in ${targets[@]} ; do
           fileTarget[$t]="${target}"
           t=$((t+1))
         done
@@ -297,7 +304,7 @@ runs:
         text="${text}\n  <file src=\"${readme}\" target=\"docs/README.md\" />"
         text="${text}\n  <file src=\"${icon}\" target=\"images/icon.png\" />"
         s=0
-        for source in ${fileSources[@]} ; do
+        for source in ${sources[@]} ; do
           target="${fileTarget[$s]}"
           echo "Adding ${source} -> ${target}"
           text="${text}\n  <file src=\"${source}\" target=\"${target}\" />"
