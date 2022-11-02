@@ -142,7 +142,7 @@ runs:
         if [ "$title" == "" ] ; then
           title="${githubRepository#*/} $version"
         fi
-        echo "::set-output name=title::$title"
+        echo "itle=$title" >> $GITHUB_OUTPUT
 
     - name: Description
       id: description
@@ -154,7 +154,7 @@ runs:
         if [ "$description" == "" ] ; then
           description="$repoDescription"
         fi
-        echo "::set-output name=description::$description"
+        echo "description=$description" >> $GITHUB_OUTPUT
 
     - name: Homepage
       id: url
@@ -173,7 +173,7 @@ runs:
         if [ "$homepage" == "" ] ; then
           homepage="https://stirlinglabs.com"
         fi
-        echo "::set-output name=homepage::$homepage"
+        echo "homepage=$homepage" >> $GITHUB_OUTPUT
 
     - name: ReadMe file
       id: readme
@@ -228,7 +228,7 @@ runs:
           space=" "
         done
         t="$t$space$owner $project"
-        echo "::set-output name=tags::$t"
+        echo "tags=$t" >> $GITHUB_OUTPUT
 
     - name: License
       id: license
@@ -244,7 +244,7 @@ runs:
             echo "Defaulting to no published license (i.e. proprietary). This will probably fail."
           fi
         fi
-        echo "::set-output name=license::$license"
+        echo "license=$license" >> $GITHUB_OUTPUT
 
     - name: Git Details
       id: git
@@ -270,9 +270,9 @@ runs:
         if [[ "$gitCommit" == "" ]] ; then
           gitCommit=$currentRepoCommit
         fi
-        echo "::set-output name=url::${gitUrl}"
-        echo "::set-output name=branch::${gitBranch}"
-        echo "::set-output name=commit::${gitCommit}"
+        echo "url=${gitUrl}" >> $GITHUB_OUTPUT
+        echo "branch=${gitBranch}" >> $GITHUB_OUTPUT
+        echo "commit=${gitCommit}" >> $GITHUB_OUTPUT
 
     - name: Files
       id: files
@@ -316,7 +316,7 @@ runs:
         echo "---"
         echo $json
         echo "---"
-        echo "::set-output name=json::$json"
+        echo "json=$json" >> $GITHUB_OUTPUT
 
     - name: Create NuSpec
       id: create
@@ -384,4 +384,4 @@ runs:
         filename=${id}.nuspec
         echo -e $text > $filename
         cat $filename
-        echo "::set-output name=filename::${filename}"
+        echo "filename=${filename}" >> $GITHUB_OUTPUT
