@@ -149,16 +149,10 @@ runs:
       shell: bash
       env:
         description: ${{ inputs.description }}
-        githubRepositoryDescription: ${{ steps.data.outputs.description }}
+        repoDescription: ${{ steps.data.outputs.description }}
       run: |
-        if [ "$description" != "" ] ; then
-          echo "Description is... $description"
-        elif [ "$githubRepositoryDescription" != "" ] ; then
-          description="$githubRepositoryDescription"
-          echo "Description is... $description"
-        else
-          echo "Must have a description!"
-          exit 1
+        if [ "$description" == "" ] ; then
+          description="$repoDescription"
         fi
         echo "::set-output name=description::$description"
 
@@ -219,6 +213,8 @@ runs:
       env:
         tags: ${{ inputs.tags }}
         topics: ${{ steps.data.outputs.topics }}
+        owner: ${{ steps.repo.outputs.owner }}
+        project: ${{ steps.repo.outputs.project }}
       run: |
         topicsArray=$(jq -r '.[]' <<< $topics)
         if [ "$tags" == "" ] ; then
@@ -231,6 +227,7 @@ runs:
           t="$t$space$topic"
           space=" "
         done
+        t="$t$space$owner $project"
         echo "::set-output name=tags::$t"
 
     - name: License
@@ -364,7 +361,13 @@ runs:
         text="${text}\n  <tags>$tags</tags>"
         text="${text}\n  <license type=\"expression\">${license}</license>"
         text="${text}\n  <requireLicenseAcceptance>true</requireLicenseAcceptance>"
-        text="${text}\n  <repository type=\"git\" url=\"${gitUrl}\" branch=\"${branch}\" commit=\"${commit}\" />"
+        if [ "$gitUrl" != "" ] || [ "$branch" != "" ] || [ "$commit" != "" ] ; then
+          repoDetail=""
+          [ "$gitUrl" != "" ] && repoDetail="${repoDetail}url=\"${gitUrl}\" "
+          [ "$branch" != "" ] && repoDetail="${repoDetail}branch=\"${branch}\" "
+          [ "$commit" != "" ] && repoDetail="${repoDetail}commit=\"${commit}\" "
+          text="${text}\n  <repository type=\"git\" ${repoDetail}/>"
+        fi
         text="${text}\n </metadata>"
         text="${text}\n <files>"
         text="${text}\n  <file src=\"${readme}\" target=\"docs/README.md\" />"
