@@ -65,12 +65,78 @@ runs:
         GITHUB_CONTEXT: ${{ toJSON(github) }}
       run: echo "$GITHUB_CONTEXT"
 
+    - name: Repo Selection
+      id: repo
+      shell: bash
+      env:
+        inputGitUrl: ${{ inputs.gitUrl }}
+        repository: ${{ github.repository }}
+      run: |
+        if [[ "$inputGitUrl" != "" ]] ; then
+          if [[ "$inputGitUrl" != *"github"* ]] ; then
+            echo "This Action only supports GitHub repos." && exit 1
+          fi
+          re="^((https?|ssh|git|ftps?):\/\/)?(([^\/@]+)@)?([^\/:]+)[\/:]([^\/:]+)\/(.+).git\/?$"
+          if [[ $inputGitUrl =~ $re ]]; then
+            # protocol=${BASH_REMATCH[1]} && separator=${BASH_REMATCH[2]} && hostname=${BASH_REMATCH[3]}
+            owner=${BASH_REMATCH[4]}
+            project=${BASH_REMATCH[5]}
+            repository="${owner}/${project}"
+            echo "gitUrl=$inputGitUrl" >> $GITHUB_OUTPUT
+          else
+            echo "This git URL is invalid: $inputGitUrl" && exit 1
+          fi
+        else
+          owner="${repository%/*}"
+          project="${repository#*/}"
+        fi
+        echo "owner=$owner" >> $GITHUB_OUTPUT
+        echo "project=$project" >> $GITHUB_OUTPUT
+        echo "repository=$repository" >> $GITHUB_OUTPUT
+
+    - name: Collect Data
+      id: data
+      shell: bash
+      env:
+        repository: ${{ steps.repo.outputs.repository }}
+        description: ${{ github.event.repository.description }}
+        homepage: ${{ github.event.repository.homepage }}
+        htmlUrl: ${{ github.event.repository.html_url }}
+        topics: ${{ toJSON(github.event.repository.topics) }}
+        license: ${{ github.event.repository.license.spdx_id }}
+        gitUrl: ${{ github.event.repository.git_url }}
+        defaultBranch: ${{ github.event.repository.default_branch }}
+      run: |
+        # init
+        json=""
+        api="https://api.github.com/repos/${repository}"
+        echo "api=${api}" >> $GITHUB_OUTPUT
+        # Define function
+        updateValue() {
+          [[ "$1" != "" ]] && _var="$1" || exit 1
+          [[ "$2" != "" ]] && _term="$2" || _term="$1"
+          # if the value is an empty string or empty array
+          if [[ "${!_var}" =~ "^$|\[[[:space:]]*\]" ]] ; then
+            [[ "$json" == "" ]] && json=$(curl -s $api);
+            read "${_var}" <<< $(jq -r ".${_term}" <<< "$json")
+          fi
+          echo "${_var}=${!_var}" >> $GITHUB_OUTPUT
+        }
+        # Do work
+        updateValue "description"
+        updateValue "homepage"
+        updateValue "htmlUrl" "html_url"
+        updateValue "topics"
+        updateValue "license" "license.spdx_id"        
+        updateValue "gitUrl" "git_url"        
+        updateValue "defaultBranch" "default_branch"        
+
     - name: Title
       id: title
       shell: bash
       env:
         title: ${{ inputs.title }}
-        githubRepository: ${{ github.repository }}
+        githubRepository: ${{ steps.data.outputs.repository }}
         version: ${{ inputs.version }}
       run: |
         if [ "$title" == "" ] ; then
@@ -83,7 +149,7 @@ runs:
       shell: bash
       env:
         description: ${{ inputs.description }}
-        githubRepositoryDescription: ${{ github.event.repository.description }}
+        githubRepositoryDescription: ${{ steps.data.outputs.description }}
       run: |
         if [ "$description" != "" ] ; then
           echo "Description is... $description"
@@ -101,8 +167,8 @@ runs:
       shell: bash
       env:
         homepage: ${{ inputs.homepage }}
-        repoHomepage: ${{ github.event.repository.homepage }}
-        repoHtmlUrl: ${{ github.event.repository.html_url }}
+        repoHomepage: ${{ steps.data.outputs.homepage }}
+        repoHtmlUrl: ${{ steps.data.outputs.html_url }}
       run: |
         if [ "$homepage" == "" ] ; then
           homepage="$repoHomepage"
@@ -152,7 +218,7 @@ runs:
       shell: bash
       env:
         tags: ${{ inputs.tags }}
-        topics: ${{ toJSON(github.event.repository.topics) }}
+        topics: ${{ steps.data.outputs.topics }}
       run: |
         topicsArray=$(jq -r '.[]' <<< $topics)
         if [ "$tags" == "" ] ; then
@@ -172,7 +238,7 @@ runs:
       shell: bash
       env:
         license: ${{ inputs.license }}
-        repoLicense: ${{ github.event.repository.license.spdx_id }}
+        repoLicense: ${{ steps.data.outputs.license }}
       run: |
         if [ "$license" == "" ] ; then
           if [ "$repoLicense" != "" ] ; then
@@ -183,15 +249,15 @@ runs:
         fi
         echo "::set-output name=license::$license"
 
-    - name: Repo
+    - name: Git Details
       id: git
       shell: bash
       env:
-        gitUrl: ${{ inputs.gitUrl }}
+        gitUrl: ${{ steps.repo.outputs.gitUrl }}
         gitBranch: ${{ inputs.gitBranch }}
         gitCommit: ${{ inputs.gitCommit }}
-        currentRepoUrl: ${{ github.event.repository.git_url }}
-        currentRepoDefaultBranch: ${{ github.event.repository.default_branch }}
+        currentRepoUrl: ${{ steps.data.outputs.git_url }}
+        currentRepoDefaultBranch: ${{ steps.data.outputs.default_branch }}
         currentRepoCommit: ${{ github.sha }}
       run: |
         if [[ "$gitUrl" == "" ]] ; then
