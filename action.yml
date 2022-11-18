@@ -115,6 +115,7 @@ runs:
         updateValue() {
           [[ "$1" != "" ]] && _var="$1" || exit 1
           [[ "$2" != "" ]] && _term="$2" || _term="$1"
+          echo "Processing ${_var}"
           # if the value is an empty string or empty array
           if [[ "${!_var}" =~ "^$|\[[[:space:]]*\]" ]] ; then
             [[ "$json" == "" ]] && json=$(curl -s $api);
@@ -122,14 +123,18 @@ runs:
           fi
           echo "${_var}=${!_var}" >> $GITHUB_OUTPUT
         }
-        # Do work
+        # Update values with 
         updateValue "description"
         updateValue "homepage"
         updateValue "htmlUrl" "html_url"
-        updateValue "topics"
         updateValue "license" "license.spdx_id"        
         updateValue "gitUrl" "git_url"        
-        updateValue "defaultBranch" "default_branch"        
+        updateValue "defaultBranch" "default_branch"
+        # Update Topics
+        jsonTopics=$(jq -r ".topics" <<< "$json")
+        bothTopicArrays="$topics $jsonTopics"
+        topics=$(jq -s 'add | unique' <<< $bothTopicArrays)
+        echo "topics=$topics" >> $GITHUB_OUTPUT
 
     - name: Title
       id: title
