@@ -133,7 +133,8 @@ runs:
         # Update Topics
         jsonTopics=$(jq -r ".topics" <<< "$json")
         bothTopicArrays="$topics $jsonTopics"
-        topics=$(jq -s 'add | unique' <<< $bothTopicArrays)
+        topics=$(jq -s -c 'add | unique' <<< $bothTopicArrays)
+        echo "Topics are $topics"
         echo "topics=$topics" >> $GITHUB_OUTPUT
 
     - name: Title
