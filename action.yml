@@ -148,7 +148,7 @@ runs:
         if [ "$title" == "" ] ; then
           title="${githubRepository#*/} $version"
         fi
-        echo "itle=$title" >> $GITHUB_OUTPUT
+        echo "title=$title" >> $GITHUB_OUTPUT
 
     - name: Description
       id: description
