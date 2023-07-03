@@ -123,12 +123,12 @@ runs:
         updateValue() {
           [[ "$1" != "" ]] && _var="$1" || exit 1
           [[ "$2" != "" ]] && _term="$2" || _term="$1"
-          echo "Processing ${_var}"
           # if the value is an empty string or empty array
           if [[ "${!_var}" =~ "^$|\[[[:space:]]*\]" ]] ; then
             [[ "$json" == "" ]] && json=$(curl -s $api);
             read "${_var}" <<< $(jq -r ".${_term}" <<< "$json")
           fi
+          echo "Setting ${_var} = ${!_var}"
           echo "${_var}=${!_var}" >> $GITHUB_OUTPUT
         }
         # Update values with 
@@ -174,19 +174,15 @@ runs:
       id: url
       shell: bash
       env:
-        homepage: ${{ inputs.homepage }}
         repoHomepage: ${{ steps.data.outputs.homepage }}
         repoHtmlUrl: ${{ steps.data.outputs.html_url }}
+        homepage: ${{ inputs.homepage }}
       run: |
-        if [ "$homepage" == "" ] ; then
-          homepage="$repoHomepage"
-        fi
-        if [ "$homepage" == "" ] ; then
-          homepage="$repoHtmlUrl"
-        fi
-        if [ "$homepage" == "" ] ; then
-          homepage="https://stirlinglabs.com"
-        fi
+        echo "homepage=${homepage}."
+        [[ "$homepage" == "" ]] && homepage="$repoHomepage"
+        [[ "$homepage" == "" ]] && homepage="$repoHtmlUrl"
+        [[ "$homepage" == "" ]] && homepage="https://stirlinglabs.com"
+        echo "homepage=${homepage}."
         echo "homepage=$homepage" >> $GITHUB_OUTPUT
 
     - name: ReadMe file
@@ -341,7 +337,7 @@ runs:
         title: ${{ steps.title.outputs.title }}
         description: ${{ steps.description.outputs.description }}
         authors: ${{ inputs.authors }}
-        homepage: ${{ steps.url.outputs.repoHtmlUrl }}
+        homepage: ${{ steps.url.outputs.homepage }}
         readme: ${{ inputs.readme }}
         icon: ${{ inputs.icon }}
         tags: ${{ steps.tags.outputs.tags }}
