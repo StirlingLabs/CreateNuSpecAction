@@ -383,16 +383,20 @@ runs:
           [ "$commit" != "" ] && repoDetail="${repoDetail}commit=\"${commit}\" "
           text="${text}\n  <repository type=\"git\" ${repoDetail}/>"
         fi
-        text="${text}\n </metadata>"
         if [[ "$targetFrameworks" != "" ]] ; then
           echo "targetFrameworks... $targetFrameworks"
           readarray -td';' frameworks <<<"$targetFrameworks;"
           unset 'frameworks[-1]' # remove final entry that was created by the ; we added
-          [[ ${#frameworks[@]} -gt 1 ]] && targetFrameworkTag="targetFrameworks" || targetFrameworkTag="targetFramework"
-          text="${text}\n  <dependencies>"
-          text="${text}\n    <group ${targetFrameworkTag}=\"${targetFrameworks}\" />"
-          text="${text}\n  </dependencies>"
+          # [[ ${#frameworks[@]} -gt 1 ]] && targetFrameworkTag="targetFrameworks" || targetFrameworkTag="targetFramework"
+          if [[ ${#frameworks[@]} -gt 1 ]] ; then
+            text="${text}\n  <dependencies>"
+            for framework in ${frameworks[@]} ; do
+              text="${text}\n    <group targetFramework=\"${framework}\" />"
+            done
+            text="${text}\n  </dependencies>"
+          fi
         fi
+        text="${text}\n </metadata>"
         text="${text}\n <files>"
         text="${text}\n  <file src=\"${readme}\" target=\"docs/README.md\" />"
         text="${text}\n  <file src=\"${icon}\" target=\"images/icon.png\" />"
