@@ -341,7 +341,7 @@ runs:
         title: ${{ steps.title.outputs.title }}
         description: ${{ steps.description.outputs.description }}
         authors: ${{ inputs.authors }}
-        homepage: ${{ steps.url.outputs.homepage }}
+        homepage: ${{ steps.url.outputs.repoHtmlUrl }}
         readme: ${{ inputs.readme }}
         icon: ${{ inputs.icon }}
         tags: ${{ steps.tags.outputs.tags }}
@@ -383,14 +383,16 @@ runs:
           [ "$commit" != "" ] && repoDetail="${repoDetail}commit=\"${commit}\" "
           text="${text}\n  <repository type=\"git\" ${repoDetail}/>"
         fi
+        text="${text}\n </metadata>"
         if [[ "$targetFrameworks" != "" ]] ; then
           echo "targetFrameworks... $targetFrameworks"
           readarray -td';' frameworks <<<"$targetFrameworks;"
           unset 'frameworks[-1]' # remove final entry that was created by the ; we added
           [[ ${#frameworks[@]} -gt 1 ]] && targetFrameworkTag="targetFrameworks" || targetFrameworkTag="targetFramework"
-          text="${text}\n  <${targetFrameworkTag}>${targetFrameworks}</${targetFrameworkTag}>"
+          text="${text}\n  <dependencies>"
+          text="${text}\n    <group ${targetFrameworkTag}=\"${targetFrameworks}\" />"
+          text="${text}\n  </dependencies>"
         fi
-        text="${text}\n </metadata>"
         text="${text}\n <files>"
         text="${text}\n  <file src=\"${readme}\" target=\"docs/README.md\" />"
         text="${text}\n  <file src=\"${icon}\" target=\"images/icon.png\" />"
