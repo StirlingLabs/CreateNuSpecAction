@@ -384,7 +384,7 @@ runs:
           text="${text}\n  <repository type=\"git\" ${repoDetail}/>"
         fi
         if [[ "$targetFrameworks" != "" ]] ; then
-          readarray -td; frameworks <<<"$targetFrameworks;"
+          readarray -td';' frameworks <<<"$targetFrameworks;"
           unset 'frameworks[-1]' # remove final entry that was created by the ; we added
           [[ ${#frameworks[@]} -gt 1 ]] && targetFrameworkTag="targetFrameworks" || targetFrameworkTag="targetFramework"
           text="${text}\n  <dependencies>"
